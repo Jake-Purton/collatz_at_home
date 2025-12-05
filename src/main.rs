@@ -49,6 +49,7 @@ async fn run() {
         63728127,             // Another interesting case
         670617279,            // Takes many steps
         989345275647,         // Large number with long sequence
+        (1<<100) - 1,
     ];
 
     // Convert to GPU format (4 × u32 per number)
