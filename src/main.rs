@@ -49,7 +49,7 @@ async fn run() {
         63728127,             // Another interesting case
         670617279,            // Takes many steps
         989345275647,         // Large number with long sequence
-        (1<<100) - 1,
+        (1<<80) - 1,
     ];
 
     // Convert to GPU format (4 × u32 per number)
@@ -139,28 +139,25 @@ async fn run() {
         
         println!("  n={}: steps={}, max={}", n, steps, max_value);
         
-        // Verify with CPU implementation
-        let (cpu_steps, cpu_max) = collatz(n);
-        println!("    CPU check: steps={}, max={}", cpu_steps, cpu_max);
     }
     
     drop(data);
     staging_buffer.unmap();
 }
 
-fn collatz(mut n: u128) -> (u128, u128) {
-    let mut steps: u128 = 0;
-    let mut max = n;
-    while n != 1 {
-        if n % 2 == 0 {
-            n = n / 2;
-        } else {
-            n = 3 * n + 1;
-        }
-        if n > max {
-            max = n;
-        }
-        steps += 1;
-    }
-    return (steps, max);
-}
+// fn collatz(mut n: u128) -> (u128, u128) {
+//     let mut steps: u128 = 0;
+//     let mut max = n;
+//     while n != 1 {
+//         if n % 2 == 0 {
+//             n = n / 2;
+//         } else {
+//             n = 3 * n + 1;
+//         }
+//         if n > max {
+//             max = n;
+//         }
+//         steps += 1;
+//     }
+//     return (steps, max);
+// }

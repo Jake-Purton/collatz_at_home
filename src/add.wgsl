@@ -28,27 +28,37 @@ fn div_by_2(n: U128) -> U128 {
     return result;
 }
 
-fn add_u128(a: U128, b: U128) -> U128 {
-    var result: U128;
+struct U128AddResult {
+    value: U128,
+    carry: u32,      // 1 if overflowed past 128 bits
+};
+
+fn add_u128(a: U128, b: U128) -> U128AddResult {
+    var total: U128;
+    var res: U128AddResult;
     var carry = 0u;
-    
+
     let sum0 = a.parts[0] + b.parts[0];
-    result.parts[0] = sum0;
+    total.parts[0] = sum0;
     carry = u32(sum0 < a.parts[0]);
-    
+
     let sum1 = a.parts[1] + b.parts[1] + carry;
-    result.parts[1] = sum1;
+    total.parts[1] = sum1;
     carry = u32(sum1 < a.parts[1] || (carry == 1u && sum1 == a.parts[1]));
-    
+
     let sum2 = a.parts[2] + b.parts[2] + carry;
-    result.parts[2] = sum2;
+    total.parts[2] = sum2;
     carry = u32(sum2 < a.parts[2] || (carry == 1u && sum2 == a.parts[2]));
-    
+
     let sum3 = a.parts[3] + b.parts[3] + carry;
-    result.parts[3] = sum3;
-    
-    return result;
+    total.parts[3] = sum3;
+    carry = u32(sum3 < a.parts[3] || (carry == 1u && sum3 == a.parts[3]));
+
+    res.value=total;
+    res.carry=carry;
+    return res;
 }
+
 
 fn mul_3_add_1(n: U128) -> U128 {
     let doubled = add_u128(n, n);
