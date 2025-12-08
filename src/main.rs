@@ -1,6 +1,7 @@
 use wgpu::util::DeviceExt;
 use std::fs::File;
 use std::io::Write;
+use std::io::BufWriter;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -116,10 +117,9 @@ async fn run() {
 
     let data = buffer_slice.get_mapped_range();
     let results: &[u32] = bytemuck::cast_slice(&data);
-    
-    // Parse results: 5 u32s per result (steps + 4 for U128)
-    let mut output = String::new();
-    output.push_str("Collatz Results:\n");
+
+    let file = File::create("collatz_results.bin").expect("Failed to create file");
+    let mut writer = BufWriter::new(file);
     
     for (i, &n) in test_numbers.iter().enumerate() {
         let offset = i * 5;
@@ -132,33 +132,38 @@ async fn run() {
         ];
         let max_value = u32_array_to_u128(&max_parts);
         
-        let line = format!("n={}: steps={}, max={}\n", n, steps, max_value);
-        output.push_str(&line);
-        // print!("  {}", line);
+        // Write binary data: input (16 bytes) + steps (4 bytes) + max (16 bytes)
+        writer.write_all(&n.to_le_bytes()).expect("Failed to write input");
+        writer.write_all(&steps.to_le_bytes()).expect("Failed to write steps");
+        writer.write_all(&max_value.to_le_bytes()).expect("Failed to write max");
+        
+        // Optional: print summary
+        // if i < 10 || i % 1000 == 0 {
+        //     println!("n={}: steps={}, max={}", n, steps, max_value);
+        // }
     }
     
-    // Write to file
-    let mut file = File::create("collatz_results.txt").expect("Failed to create file");
-    file.write_all(output.as_bytes()).expect("Failed to write to file");
-    println!("\nResults written to collatz_results.txt");
+    println!("\n{} results written to collatz_results.bin ({} bytes)", 
+             test_numbers.len(), 
+             test_numbers.len() * 36);
     
     drop(data);
     staging_buffer.unmap();
 }
 
-fn collatz(mut n: u128) -> (u128, u128) {
-    let mut steps: u128 = 0;
-    let mut max = n;
-    while n != 1 {
-        if n % 2 == 0 {
-            n = n / 2;
-        } else {
-            n = 3 * n + 1;
-        }
-        if n > max {
-            max = n;
-        }
-        steps += 1;
-    }
-    return (steps, max);
-}
+// fn collatz(mut n: u128) -> (u128, u128) {
+//     let mut steps: u128 = 0;
+//     let mut max = n;
+//     while n != 1 {
+//         if n % 2 == 0 {
+//             n = n / 2;
+//         } else {
+//             n = 3 * n + 1;
+//         }
+//         if n > max {
+//             max = n;
+//         }
+//         steps += 1;
+//     }
+//     return (steps, max);
+// }
