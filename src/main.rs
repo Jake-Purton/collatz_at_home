@@ -1,4 +1,6 @@
 use wgpu::util::DeviceExt;
+use std::fs::File;
+use std::io::Write;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -41,16 +43,7 @@ async fn run() {
     let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default(), None).await.unwrap();
 
     // Test with some interesting Collatz numbers
-    let test_numbers: Vec<u128> = vec![
-        27,
-        1000000,
-        9780657630,           // Known to have a long sequence
-        77031,                // Reaches very high max value
-        63728127,             // Another interesting case
-        670617279,            // Takes many steps
-        989345275647,         // Large number with long sequence
-        (1<<80) - 1,
-    ];
+    let test_numbers: Vec<u128> = ((1_u128 << 100)..(1_u128 << 100)+1000000).collect();
 
     // Convert to GPU format (4 × u32 per number)
     let input_data: Vec<u8> = test_numbers
@@ -125,7 +118,9 @@ async fn run() {
     let results: &[u32] = bytemuck::cast_slice(&data);
     
     // Parse results: 5 u32s per result (steps + 4 for U128)
-    println!("\nCollatz Results:");
+    let mut output = String::new();
+    output.push_str("Collatz Results:\n");
+    
     for (i, &n) in test_numbers.iter().enumerate() {
         let offset = i * 5;
         let steps = results[offset];
@@ -137,13 +132,15 @@ async fn run() {
         ];
         let max_value = u32_array_to_u128(&max_parts);
         
-        println!("  n={}: steps={}, max={}", n, steps, max_value);
-
-        let (steps, max) = collatz(n);
-        println!("  n={}: steps={}, max={}", n, steps, max);
-    }   
-
-
+        let line = format!("n={}: steps={}, max={}\n", n, steps, max_value);
+        output.push_str(&line);
+        // print!("  {}", line);
+    }
+    
+    // Write to file
+    let mut file = File::create("collatz_results.txt").expect("Failed to create file");
+    file.write_all(output.as_bytes()).expect("Failed to write to file");
+    println!("\nResults written to collatz_results.txt");
     
     drop(data);
     staging_buffer.unmap();

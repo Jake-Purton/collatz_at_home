@@ -164,7 +164,6 @@ fn collatz(n_input: U128) -> CollatzResult {
         }
     }
     
-    
     result.steps = steps;
     result.max = max;
     return result;
