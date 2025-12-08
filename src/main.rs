@@ -138,26 +138,30 @@ async fn run() {
         let max_value = u32_array_to_u128(&max_parts);
         
         println!("  n={}: steps={}, max={}", n, steps, max_value);
-        
-    }
+
+        let (steps, max) = collatz(n);
+        println!("  n={}: steps={}, max={}", n, steps, max);
+    }   
+
+
     
     drop(data);
     staging_buffer.unmap();
 }
 
-// fn collatz(mut n: u128) -> (u128, u128) {
-//     let mut steps: u128 = 0;
-//     let mut max = n;
-//     while n != 1 {
-//         if n % 2 == 0 {
-//             n = n / 2;
-//         } else {
-//             n = 3 * n + 1;
-//         }
-//         if n > max {
-//             max = n;
-//         }
-//         steps += 1;
-//     }
-//     return (steps, max);
-// }
+fn collatz(mut n: u128) -> (u128, u128) {
+    let mut steps: u128 = 0;
+    let mut max = n;
+    while n != 1 {
+        if n % 2 == 0 {
+            n = n / 2;
+        } else {
+            n = 3 * n + 1;
+        }
+        if n > max {
+            max = n;
+        }
+        steps += 1;
+    }
+    return (steps, max);
+}

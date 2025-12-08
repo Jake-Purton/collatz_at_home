@@ -4,7 +4,7 @@ struct U128 {
 
 struct CollatzResult {
     steps: u32,
-    max: U128
+    max: U128,
 }
 
 @group(0) @binding(0) var<storage, read> input: array<U128>;
@@ -60,22 +60,27 @@ fn add_u128(a: U128, b: U128) -> U128AddResult {
 }
 
 
-fn mul_3_add_1(n: U128) -> U128 {
+fn mul_3_add_1(n: U128) -> U128AddResult {
+
     let doubled = add_u128(n, n);
-    let tripled = add_u128(doubled, n);
-    
-    var result = tripled;
-    result.parts[0] = result.parts[0] + 1u;
-    
-    if (result.parts[0] == 0u) {
-        result.parts[1] = result.parts[1] + 1u;
-        if (result.parts[1] == 0u) {
-            result.parts[2] = result.parts[2] + 1u;
-            if (result.parts[2] == 0u) {
-                result.parts[3] = result.parts[3] + 1u;
-            }
-        }
+
+    if doubled.carry == 1u {
+        return doubled;
     }
+
+    let tripled = add_u128(doubled.value, n);
+
+    if tripled.carry == 1u {
+        return tripled;
+    }
+
+    var one: U128;
+    one.parts[0] = 1u;
+    one.parts[1] = 0u;
+    one.parts[2] = 0u;
+    one.parts[3] = 0u;
+    
+    let result = add_u128(tripled.value, one);
     
     return result;
 }
@@ -102,6 +107,8 @@ fn collatz(n_input: U128) -> CollatzResult {
     var slow = n;
     var fast = n;
     var slow_steps = 0u;
+
+    var result: CollatzResult;
     
     loop {
         if (is_one(n)) {
@@ -116,7 +123,22 @@ fn collatz(n_input: U128) -> CollatzResult {
         if (is_even(n)) {
             n = div_by_2(n);
         } else {
-            n = mul_3_add_1(n);
+            let a = mul_3_add_1(n);
+            if a.carry == 1u {
+
+                var zero: U128;
+                zero.parts[0] = 0u;
+                zero.parts[1] = 0u;
+                zero.parts[2] = 0u;
+                zero.parts[3] = 0u;
+
+                result.steps = steps;
+                result.max = zero;
+                return result;
+            }
+
+            n = a.value;
+
         }
         
         if (greater_than(n, max)) {
@@ -130,7 +152,7 @@ fn collatz(n_input: U128) -> CollatzResult {
             if (is_even(slow)) {
                 slow = div_by_2(slow);
             } else {
-                slow = mul_3_add_1(slow);
+                slow = mul_3_add_1(slow).value;
             }
             slow_steps++;
             
@@ -142,7 +164,7 @@ fn collatz(n_input: U128) -> CollatzResult {
         }
     }
     
-    var result: CollatzResult;
+    
     result.steps = steps;
     result.max = max;
     return result;
