@@ -1,6 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const check_webgpu_support: () => any;
 export const do_gpu_collatz: (a: number, b: number) => any;
 export const init: () => void;
 export const wasm_bindgen__convert__closures_____invoke__hdf270ce0da308ff1: (a: number, b: number, c: any) => void;

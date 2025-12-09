@@ -1,6 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export function check_webgpu_support(): Promise<boolean>;
+
 export function do_gpu_collatz(start_n: string): Promise<void>;
 
 export function init(): void;
@@ -9,6 +11,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly check_webgpu_support: () => any;
   readonly do_gpu_collatz: (a: number, b: number) => any;
   readonly init: () => void;
   readonly wasm_bindgen__convert__closures_____invoke__hdf270ce0da308ff1: (a: number, b: number, c: any) => void;

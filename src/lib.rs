@@ -3,7 +3,7 @@ mod debug;
 use wasm_bindgen::prelude::*;
 use wgpu::util::DeviceExt;
 
-const RANGE: u128 = 1000_000;
+const RANGE: u128 = 1_000_000;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -31,6 +31,20 @@ fn u32_array_to_bytes(parts: &[u32; 4]) -> [u8; 16] {
         bytes[i * 4..(i + 1) * 4].copy_from_slice(&part_bytes);
     }
     bytes
+}
+
+#[wasm_bindgen]
+pub async fn check_webgpu_support() -> bool {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::BROWSER_WEBGPU,
+        ..Default::default()
+    });
+    
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions::default())
+        .await;
+    
+    adapter.is_some()
 }
 
 #[wasm_bindgen(start)]
@@ -155,8 +169,19 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
     queue.submit(Some(encoder.finish()));
 
     let buffer_slice = staging_buffer.slice(..);
-    buffer_slice.map_async(wgpu::MapMode::Read, |_| {});
+    
+    // In WASM, we need to use a channel to properly await the buffer mapping
+    let (sender, receiver) = flume::bounded(1);
+    buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+        let _ = sender.send(result);
+    });
+    
+    // Poll the device until the buffer is mapped
     device.poll(wgpu::Maintain::Wait);
+    
+    // Wait for the mapping to complete
+    receiver.recv_async().await.map_err(|e| JsValue::from_str(&format!("Channel error: {}", e)))?
+        .map_err(|e| JsValue::from_str(&format!("Buffer mapping failed: {:?}", e)))?;
 
     let data = buffer_slice.get_mapped_range();
     let results: &[u32] = bytemuck::cast_slice(&data);
@@ -172,7 +197,7 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         ];
         let max_value = u32_array_to_u128(&max_parts);
 
-        console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
+        // console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
     }
 
     drop(data);

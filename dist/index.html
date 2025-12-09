@@ -6,32 +6,54 @@
 </head>
 <body>
     <h1>Collatz at Home</h1>
+    <p id="webgpu-status">Checking WebGPU support...</p>
     <input type="text" id="startN" value="1" placeholder="Starting number">
-    <button id="runBtn">Run GPU Collatz</button>
+    <button id="runBtn" disabled>Run GPU Collatz</button>
     <pre id="output"></pre>
     
     <script type="module">
-        import init, { do_gpu_collatz } from './collatz_at_home.js';
+        import init, { do_gpu_collatz, check_webgpu_support } from './collatz_at_home.js';
         
         const output = document.getElementById('output');
+        const status = document.getElementById('webgpu-status');
+        const runBtn = document.getElementById('runBtn');
         
         async function main() {
             output.textContent = 'Loading WASM...';
+            
+            // Check native WebGPU first
+            if (!navigator.gpu) {
+                status.textContent = '❌ WebGPU not available in this browser. Try Chrome 113+ or Edge 113+';
+                status.style.color = 'red';
+                output.textContent = 'WebGPU is required but not supported.';
+                return;
+            }
+            
             try {
                 await init();
-                output.textContent = 'WASM loaded! Click button to run.';
+                output.textContent = 'WASM loaded!';
+                
+                const supported = await check_webgpu_support();
+                if (supported) {
+                    status.textContent = '✅ WebGPU supported!';
+                    status.style.color = 'green';
+                    runBtn.disabled = false;
+                } else {
+                    status.textContent = '❌ WebGPU adapter not found';
+                    status.style.color = 'red';
+                }
             } catch (e) {
                 output.textContent = 'Error loading WASM: ' + e;
                 console.error(e);
             }
         }
         
-        document.getElementById('runBtn').addEventListener('click', async () => {
+        runBtn.addEventListener('click', async () => {
             const startN = document.getElementById('startN').value;
             output.textContent = 'Running GPU Collatz...';
             try {
                 await do_gpu_collatz(startN);
-                output.textContent = 'Done! Check console for logs.';
+                output.textContent = 'Done! Check console (F12) for results.';
             } catch (e) {
                 output.textContent = 'Error: ' + e;
                 console.error(e);
