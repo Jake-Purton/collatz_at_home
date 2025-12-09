@@ -1,7 +1,8 @@
+mod debug;
+
 use wgpu::util::DeviceExt;
-use std::fs::File;
-use std::io::Write;
-use std::io::BufWriter;
+
+const BUFFER: u128 = 1000_000;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -44,7 +45,7 @@ async fn run() {
     let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default(), None).await.unwrap();
 
     // Test with some interesting Collatz numbers
-    let test_numbers: Vec<u128> = ((1_u128 << 100)..(1_u128 << 100)+1000000).collect();
+    let test_numbers: Vec<u128> = ((1_u128 << 100) + BUFFER..(1_u128 << 100)+1000000 + BUFFER).collect();
 
     // Convert to GPU format (4 × u32 per number)
     let input_data: Vec<u8> = test_numbers
@@ -117,9 +118,6 @@ async fn run() {
 
     let data = buffer_slice.get_mapped_range();
     let results: &[u32] = bytemuck::cast_slice(&data);
-
-    let file = File::create("collatz_results.bin").expect("Failed to create file");
-    let mut writer = BufWriter::new(file);
     
     for (i, &n) in test_numbers.iter().enumerate() {
         let offset = i * 5;
@@ -132,20 +130,9 @@ async fn run() {
         ];
         let max_value = u32_array_to_u128(&max_parts);
         
-        // Write binary data: input (16 bytes) + steps (4 bytes) + max (16 bytes)
-        writer.write_all(&n.to_le_bytes()).expect("Failed to write input");
-        writer.write_all(&steps.to_le_bytes()).expect("Failed to write steps");
-        writer.write_all(&max_value.to_le_bytes()).expect("Failed to write max");
+        console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
         
-        // Optional: print summary
-        // if i < 10 || i % 1000 == 0 {
-        //     println!("n={}: steps={}, max={}", n, steps, max_value);
-        // }
     }
-    
-    println!("\n{} results written to collatz_results.bin ({} bytes)", 
-             test_numbers.len(), 
-             test_numbers.len() * 36);
     
     drop(data);
     staging_buffer.unmap();
