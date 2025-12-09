@@ -33,6 +33,12 @@ fn u32_array_to_bytes(parts: &[u32; 4]) -> [u8; 16] {
     bytes
 }
 
+#[wasm_bindgen(start)]
+pub fn init() {
+    console_error_panic_hook::set_once();
+    console_log!("WASM module initialized!");
+}
+
 #[wasm_bindgen]
 pub async fn do_gpu_collatz(start_n: String) {
 

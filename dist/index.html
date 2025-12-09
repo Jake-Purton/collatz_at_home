@@ -1,17 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Collatz@Home</title>
+    <meta charset="utf-8">
+    <title>Collatz GPU</title>
 </head>
 <body>
-  <h1>Test page</h1>
-  <script type="module">
-    import init, { do_gpu_collatz } from "./collatz_at_home.js";
-    async function run() {
-        await init(); // load wasm module
-        await do_gpu_collatz("100"); // call your Rust async function
-    }
-  </script>
+    <h1>Collatz at Home</h1>
+    <input type="text" id="startN" value="1" placeholder="Starting number">
+    <button id="runBtn">Run GPU Collatz</button>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        import init, { do_gpu_collatz } from './collatz_at_home.js';
+        
+        const output = document.getElementById('output');
+        
+        async function main() {
+            output.textContent = 'Loading WASM...';
+            try {
+                await init();
+                output.textContent = 'WASM loaded! Click button to run.';
+            } catch (e) {
+                output.textContent = 'Error loading WASM: ' + e;
+                console.error(e);
+            }
+        }
+        
+        document.getElementById('runBtn').addEventListener('click', async () => {
+            const startN = document.getElementById('startN').value;
+            output.textContent = 'Running GPU Collatz...';
+            try {
+                await do_gpu_collatz(startN);
+                output.textContent = 'Done! Check console for logs.';
+            } catch (e) {
+                output.textContent = 'Error: ' + e;
+                console.error(e);
+            }
+        });
+        
+        main();
+    </script>
 </body>
 </html>
