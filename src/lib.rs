@@ -1,8 +1,9 @@
 mod debug;
 
+use wasm_bindgen::prelude::*;
 use wgpu::util::DeviceExt;
 
-const BUFFER: u128 = 1000_000;
+const RANGE: u128 = 1000_000;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -32,20 +33,32 @@ fn u32_array_to_bytes(parts: &[u32; 4]) -> [u8; 16] {
     bytes
 }
 
-fn main() {
-    pollster::block_on(run());
-}
-
-async fn run() {
+#[wasm_bindgen]
+pub async fn do_gpu_collatz(start_n: String) {
     let instance = wgpu::Instance::default();
     let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions::default())
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            force_fallback_adapter: false,
+            compatible_surface: None,
+        })
+        .await
+        .expect("No WebGPU adapter found");
+
+    let (device, queue) = adapter
+        .request_device(&wgpu::DeviceDescriptor::default(), None)
         .await
         .unwrap();
-    let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default(), None).await.unwrap();
+
+    // parse start n
+    let n = if let Ok(n) = start_n.parse::<u128>() {
+        n
+    } else {
+        return;
+    };
 
     // Test with some interesting Collatz numbers
-    let test_numbers: Vec<u128> = ((1_u128 << 100) + BUFFER..(1_u128 << 100)+1000000 + BUFFER).collect();
+    let test_numbers: Vec<u128> = (n..n + RANGE).collect();
 
     // Convert to GPU format (4 × u32 per number)
     let input_data: Vec<u8> = test_numbers
@@ -61,7 +74,7 @@ async fn run() {
 
     // Output: Each result has steps (u32=4 bytes) + max (4×u32=16 bytes) = 20 bytes, but align to 32 bytes
     let output_size = test_numbers.len() * 32; // Struct padding for alignment
-    
+
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Buffer"),
         size: output_size as u64,
@@ -75,7 +88,6 @@ async fn run() {
         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
-
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Collatz Shader"),
@@ -93,15 +105,26 @@ async fn run() {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         layout: &bind_group_layout,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: input_buffer.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: output_buffer.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: input_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: output_buffer.as_entire_binding(),
+            },
         ],
         label: Some("Bind Group"),
     });
 
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Compute Encoder") });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Compute Encoder"),
+    });
     {
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("Compute Pass")});
+        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Compute Pass"),
+            timestamp_writes: None,
+        });
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         // Dispatch enough workgroups to cover all input numbers
@@ -118,7 +141,7 @@ async fn run() {
 
     let data = buffer_slice.get_mapped_range();
     let results: &[u32] = bytemuck::cast_slice(&data);
-    
+
     for (i, &n) in test_numbers.iter().enumerate() {
         let offset = i * 5;
         let steps = results[offset];
@@ -129,11 +152,10 @@ async fn run() {
             results[offset + 4],
         ];
         let max_value = u32_array_to_u128(&max_parts);
-        
+
         console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
-        
     }
-    
+
     drop(data);
     staging_buffer.unmap();
 }

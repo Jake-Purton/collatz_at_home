@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Collatz@Home</title>
+</head>
+<body>
+  <h1>Test page</h1>
+  <script type="module">
+    import init, { do_gpu_collatz } from "./collatz_at_home.js";
+    async function run() {
+        await init(); // load wasm module
+        await do_gpu_collatz("100"); // call your Rust async function
+    }
+  </script>
+</body>
+</html>
