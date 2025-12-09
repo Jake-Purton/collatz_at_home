@@ -40,7 +40,7 @@ pub fn init() {
 }
 
 #[wasm_bindgen]
-pub async fn do_gpu_collatz(start_n: String) {
+pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
 
     console_log!("hello here");
 
@@ -51,8 +51,18 @@ pub async fn do_gpu_collatz(start_n: String) {
             force_fallback_adapter: false,
             compatible_surface: None,
         })
-        .await
-        .expect("No WebGPU adapter found");
+        .await;
+
+    let adapter = match adapter {
+        Some(a) => {
+            console_log!("Adapter found: {:?}", a.get_info().name);
+            a
+        }
+        None => {
+            console_log!("ERROR: No GPU adapter found. WebGPU may not be supported in this browser.");
+            return Err(JsValue::from_str("No GPU adapter found. Try Chrome 113+ with WebGPU enabled."));
+        }
+    };
 
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor::default(), None)
@@ -63,7 +73,7 @@ pub async fn do_gpu_collatz(start_n: String) {
     let n = if let Ok(n) = start_n.parse::<u128>() {
         n
     } else {
-        return;
+        return Err(JsValue::from_str("Could not parse n"));
     };
 
     // Test with some interesting Collatz numbers
@@ -167,6 +177,8 @@ pub async fn do_gpu_collatz(start_n: String) {
 
     drop(data);
     staging_buffer.unmap();
+
+    Ok(())
 }
 
 // fn collatz(mut n: u128) -> (u128, u128) {
