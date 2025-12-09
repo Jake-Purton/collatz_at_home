@@ -60,7 +60,7 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         }
         None => {
             console_log!("ERROR: No GPU adapter found. WebGPU may not be supported in this browser.");
-            return Err(JsValue::from_str("No GPU adapter found. Try Chrome 113+ with WebGPU enabled."));
+            return Err(JsValue::from_str("No GPU adapter found. Try Chrome WebGPU enabled. Safari Does not support WebGPU"));
         }
     };
 
