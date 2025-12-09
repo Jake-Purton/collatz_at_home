@@ -197,7 +197,9 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         ];
         let max_value = u32_array_to_u128(&max_parts);
 
-        // console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
+        if n % 10_000 == 0 {
+            console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
+        }
     }
 
     drop(data);
