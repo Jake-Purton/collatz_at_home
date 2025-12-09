@@ -35,6 +35,9 @@ fn u32_array_to_bytes(parts: &[u32; 4]) -> [u8; 16] {
 
 #[wasm_bindgen]
 pub async fn do_gpu_collatz(start_n: String) {
+
+    console_log!("hello here");
+
     let instance = wgpu::Instance::default();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
