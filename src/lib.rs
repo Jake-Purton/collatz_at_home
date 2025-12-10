@@ -39,11 +39,11 @@ pub async fn check_webgpu_support() -> bool {
         backends: wgpu::Backends::BROWSER_WEBGPU,
         ..Default::default()
     });
-    
+
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions::default())
         .await;
-    
+
     adapter.is_some()
 }
 
@@ -55,10 +55,14 @@ pub fn init() {
 
 #[wasm_bindgen]
 pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
-
     console_log!("hello here");
 
-    let instance = wgpu::Instance::default();
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::BROWSER_WEBGPU,
+        ..Default::default()
+    });
+    console_log!("made it here 0");
+
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -73,31 +77,28 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
             a
         }
         None => {
-            console_log!("ERROR: No GPU adapter found. WebGPU may not be supported in this browser.");
-            return Err(JsValue::from_str("No GPU adapter found. Try Chrome WebGPU enabled. Safari Does not support WebGPU"));
+            console_log!(
+                "ERROR: No GPU adapter found. WebGPU may not be supported in this browser."
+            );
+            return Err(JsValue::from_str(
+                "No GPU adapter found. Try Chrome WebGPU enabled. Safari Does not support WebGPU",
+            ));
+        }
+    };
+    console_log!("made it here 1");
+
+    let (device, queue) = match adapter
+        .request_device(&wgpu::DeviceDescriptor::default(), None)
+        .await
+    {
+        Ok(a) => a,
+        Err(e) => {
+            console_log!("{e}");
+            return Err(JsValue::from_str(&format!("{e}")));
         }
     };
 
-
-    // CHATGPT RECCOMENDEWD FIX
-    // let limits = wgpu::Limits::downlevel_webgl2_defaults()
-    // .using_resolution(adapter.limits());
-
-    // let desc = wgpu::DeviceDescriptor {
-    //     label: None,
-    //     features: wgpu::Features::empty(),
-    //     limits,
-    // };
-
-    // let (device, queue) = adapter.request_device(&desc, None)
-    //     .await
-    //     .unwrap();
-
-
-    let (device, queue) = adapter
-        .request_device(&wgpu::DeviceDescriptor::default(), None)
-        .await
-        .unwrap();
+    console_log!("made it here 2");
 
     // parse start n
     let n = if let Ok(n) = start_n.parse::<u128>() {
@@ -184,18 +185,21 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
     queue.submit(Some(encoder.finish()));
 
     let buffer_slice = staging_buffer.slice(..);
-    
+
     // In WASM, we need to use a channel to properly await the buffer mapping
     let (sender, receiver) = flume::bounded(1);
     buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
         let _ = sender.send(result);
     });
-    
+
     // Poll the device until the buffer is mapped
     device.poll(wgpu::Maintain::Wait);
-    
+
     // Wait for the mapping to complete
-    receiver.recv_async().await.map_err(|e| JsValue::from_str(&format!("Channel error: {}", e)))?
+    receiver
+        .recv_async()
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Channel error: {}", e)))?
         .map_err(|e| JsValue::from_str(&format!("Buffer mapping failed: {:?}", e)))?;
 
     let data = buffer_slice.get_mapped_range();
