@@ -78,6 +78,22 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         }
     };
 
+
+    // CHATGPT RECCOMENDEWD FIX
+    // let limits = wgpu::Limits::downlevel_webgl2_defaults()
+    // .using_resolution(adapter.limits());
+
+    // let desc = wgpu::DeviceDescriptor {
+    //     label: None,
+    //     features: wgpu::Features::empty(),
+    //     limits,
+    // };
+
+    // let (device, queue) = adapter.request_device(&desc, None)
+    //     .await
+    //     .unwrap();
+
+
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor::default(), None)
         .await
@@ -90,7 +106,6 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         return Err(JsValue::from_str("Could not parse n"));
     };
 
-    // Test with some interesting Collatz numbers
     let test_numbers: Vec<u128> = (n..n + RANGE).collect();
 
     // Convert to GPU format (4 × u32 per number)
