@@ -52,8 +52,20 @@
             const startN = document.getElementById('startN').value;
             output.textContent = 'Running GPU Collatz...';
             try {
-                await do_gpu_collatz(startN);
-                output.textContent = 'Done! Check console (F12) for results.';
+                let a = await do_gpu_collatz(startN);
+                
+
+                const payload = { start: startN, results: a };
+
+                await fetch("/results", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    // not sure if stringify is necessary
+                    body: JSON.stringify(payload),
+                });
+
+                output.textContent = 'Done!';
+
             } catch (e) {
                 output.textContent = 'Error: ' + e;
                 console.error(e);

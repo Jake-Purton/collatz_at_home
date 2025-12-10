@@ -3,7 +3,8 @@ mod debug;
 use wasm_bindgen::prelude::*;
 use wgpu::util::DeviceExt;
 
-const RANGE: u128 = 1_000_000;
+// 50,000 is 1mb
+const RANGE: u128 = 50_000;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -54,7 +55,7 @@ pub fn init() {
 }
 
 #[wasm_bindgen]
-pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
+pub async fn do_gpu_collatz(start_n: String) -> Result<Vec<u32>, JsValue> {
     console_log!("hello here");
 
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -219,13 +220,15 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         ];
         let max_value = u32_array_to_u128(&max_parts);
 
-        if n % 10_000 == 0 {
+        if n % 25_000 == 0 {
             console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
         }
     }
 
+    let vec_results = results.to_vec();
+
     drop(data);
     staging_buffer.unmap();
 
-    Ok(())
+    Ok(vec_results)
 }
