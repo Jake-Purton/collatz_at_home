@@ -35,7 +35,7 @@ fn u32_array_to_bytes(parts: &[u32; 4]) -> [u8; 16] {
 
 #[wasm_bindgen]
 pub async fn check_webgpu_support() -> bool {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::BROWSER_WEBGPU,
         ..Default::default()
     });
@@ -44,7 +44,7 @@ pub async fn check_webgpu_support() -> bool {
         .request_adapter(&wgpu::RequestAdapterOptions::default())
         .await;
 
-    adapter.is_some()
+    adapter.is_ok()
 }
 
 #[wasm_bindgen(start)]
@@ -57,7 +57,7 @@ pub fn init() {
 pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
     console_log!("hello here");
 
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::BROWSER_WEBGPU,
         ..Default::default()
     });
@@ -72,13 +72,14 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         .await;
 
     let adapter = match adapter {
-        Some(a) => {
+        Ok(a) => {
             console_log!("Adapter found: {:?}", a.get_info().name);
             a
         }
-        None => {
+        Err(e) => {
             console_log!(
-                "ERROR: No GPU adapter found. WebGPU may not be supported in this browser."
+                "ERROR: No GPU adapter found. WebGPU may not be supported in this browser. {:?}",
+                e
             );
             return Err(JsValue::from_str(
                 "No GPU adapter found. Try Chrome WebGPU enabled. Safari Does not support WebGPU",
@@ -88,7 +89,7 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
     console_log!("made it here 1");
 
     let (device, queue) = match adapter
-        .request_device(&wgpu::DeviceDescriptor::default(), None)
+        .request_device(&wgpu::DeviceDescriptor::default())
         .await
     {
         Ok(a) => a,
@@ -147,7 +148,9 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
         label: Some("Compute Pipeline"),
         layout: None,
         module: &shader,
-        entry_point: "main",
+        entry_point: Some("main"),
+        compilation_options: wgpu::PipelineCompilationOptions::default(),
+        cache: None
     });
 
     let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
@@ -193,7 +196,7 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<(), JsValue> {
     });
 
     // Poll the device until the buffer is mapped
-    device.poll(wgpu::Maintain::Wait);
+    device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
 
     // Wait for the mapping to complete
     receiver
