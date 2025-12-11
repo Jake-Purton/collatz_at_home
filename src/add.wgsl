@@ -7,8 +7,16 @@ struct CollatzResult {
     max: U128,
 }
 
+struct U128AddResult {
+    value: U128,
+    carry: u32,      // 1 if overflowed past 128 bits
+};
+
 @group(0) @binding(0) var<storage, read> input: array<U128>;
 @group(0) @binding(1) var<storage, read_write> output: array<CollatzResult>;
+
+const ZERO_U128 = U128(array<u32, 4>(0u, 0u, 0u, 0u));
+const ONE_U128 = U128(array<u32, 4>(1u, 0u, 0u, 0u));
 
 fn is_one(n: U128) -> bool {
     return n.parts[0] == 1u && n.parts[1] == 0u && n.parts[2] == 0u && n.parts[3] == 0u;
@@ -28,10 +36,6 @@ fn div_by_2(n: U128) -> U128 {
     return result;
 }
 
-struct U128AddResult {
-    value: U128,
-    carry: u32,      // 1 if overflowed past 128 bits
-};
 
 fn add_u128(a: U128, b: U128) -> U128AddResult {
     var total: U128;
@@ -74,13 +78,7 @@ fn mul_3_add_1(n: U128) -> U128AddResult {
         return tripled;
     }
 
-    var one: U128;
-    one.parts[0] = 1u;
-    one.parts[1] = 0u;
-    one.parts[2] = 0u;
-    one.parts[3] = 0u;
-    
-    let result = add_u128(tripled.value, one);
+    let result = add_u128(tripled.value, ONE_U128);
     
     return result;
 }
@@ -92,7 +90,6 @@ fn greater_than(a: U128, b: U128) -> bool {
     return a.parts[0] > b.parts[0];
 }
 
-// Check if two U128 values are equal
 fn equals(a: U128, b: U128) -> bool {
     return a.parts[0] == b.parts[0] && a.parts[1] == b.parts[1] && 
            a.parts[2] == b.parts[2] && a.parts[3] == b.parts[3];
@@ -103,10 +100,8 @@ fn collatz(n_input: U128) -> CollatzResult {
     var steps = 0u;
     var max = n;
     
-    // Floyd's cycle detection: slow and fast pointers
-    var slow = n;
-    var fast = n;
-    var slow_steps = 0u;
+    var tortoise = n;
+    var tortoise_steps = 0u;
 
     var result: CollatzResult;
     
@@ -125,15 +120,8 @@ fn collatz(n_input: U128) -> CollatzResult {
         } else {
             let a = mul_3_add_1(n);
             if a.carry == 1u {
-
-                var zero: U128;
-                zero.parts[0] = 0u;
-                zero.parts[1] = 0u;
-                zero.parts[2] = 0u;
-                zero.parts[3] = 0u;
-
                 result.steps = steps;
-                result.max = zero;
+                result.max = ZERO_U128;
                 return result;
             }
 
@@ -147,17 +135,16 @@ fn collatz(n_input: U128) -> CollatzResult {
         
         steps++;
         
-        // Cycle detection: advance slow pointer every other step
         if (steps % 2u == 0u) {
-            if (is_even(slow)) {
-                slow = div_by_2(slow);
+            if (is_even(tortoise)) {
+                tortoise = div_by_2(tortoise);
             } else {
-                slow = mul_3_add_1(slow).value;
+                tortoise = mul_3_add_1(tortoise).value;
             }
-            slow_steps++;
+            tortoise_steps++;
             
-            // Check if we've found a cycle (fast caught up to slow)
-            if (equals(n, slow) && steps > 2u) {
+            // check if we've found a cycle (tortoise meets hare)
+            if (equals(n, tortoise) && steps > 2u) {
                 // Cycle detected, break out
                 // WE NEED SOME WAY TO RETURN CYCLE
                 break;

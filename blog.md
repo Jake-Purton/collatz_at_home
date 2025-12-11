@@ -94,12 +94,15 @@ There are also possible issues with overflows but I'll leave you to deal with th
 # GPU is tricky
 To do an equivalent function in wgsl we have to take a few more steps. The full code is at the bottom of this section.
 ## Unsigned 128 bit integers
-wgsl doesn't have `u128`s as native so we can build it up from an array of 4 `u32`s
+wgsl doesn't have `u128`s as native so we can build it up from an array of 4 `u32`s (and a couple helpful constants):
 
 ```wgsl
 struct U128 {
     parts: array<u32, 4>  // [least significant, ..., ..., most significant]
 }
+
+const ZERO_U128 = U128(array<u32, 4>(0u, 0u, 0u, 0u));
+const ONE_U128 = U128(array<u32, 4>(1u, 0u, 0u, 0u));
 ```
 
 We can also define a few specific functions for mangling the data
@@ -123,6 +126,19 @@ fn div_by_2(n: U128) -> U128 {
     result.parts[3] = n.parts[3] >> 1u;
     return result;
 }
+
+// Check if two U128 values are equal
+fn equals(a: U128, b: U128) -> bool {
+    return a.parts[0] == b.parts[0] && a.parts[1] == b.parts[1] && 
+           a.parts[2] == b.parts[2] && a.parts[3] == b.parts[3];
+}
+
+fn greater_than(a: U128, b: U128) -> bool {
+    if (a.parts[3] != b.parts[3]) { return a.parts[3] > b.parts[3]; }
+    if (a.parts[2] != b.parts[2]) { return a.parts[2] > b.parts[2]; }
+    if (a.parts[1] != b.parts[1]) { return a.parts[1] > b.parts[1]; }
+    return a.parts[0] > b.parts[0];
+}
 ```
 
 Here we have helpers to check if a `u128` is even or 1 as well as dividing a `u128` by 2. When we get to addition and multiplication however, we have to be more careful about overflowing. In wgsl `u32` addition overflows cause defined wraparound behaviour. This isn't what we want so we will have to detect an overflow has occurred and return a result that tells us this. It would also be nice to have something that tells us if we did detect a cycle.
@@ -143,8 +159,10 @@ fn add_u128(a: U128, b: U128) -> U128AddResult {
     var res: U128AddResult;
     var carry = 0u;
 
+    // add the parts
     let sum0 = a.parts[0] + b.parts[0];
     total.parts[0] = sum0;
+    // cool carry checking trick if it wraps around the sum will always be smaller than either of the parts
     carry = u32(sum0 < a.parts[0]);
 
     let sum1 = a.parts[1] + b.parts[1] + carry;
@@ -165,75 +183,9 @@ fn add_u128(a: U128, b: U128) -> U128AddResult {
 }
 ```
 
-### 3n+1
-
-## Passing data between CPU and GPU
-
-## The code
+This will return the result of the operation, and wether it overflowed. For multiplication by 3 we can just do additions to itself, multiplication would be hard to program and likely much slower than just doing a small number of addition operations. I havent tested this however and it might be that doing a left shift operation by 1 and then adding is faster.
 
 ```wgsl
-struct U128 {
-    parts: array<u32, 4>
-}
-
-struct CollatzResult {
-    steps: u32,
-    max: U128,
-}
-
-@group(0) @binding(0) var<storage, read> input: array<U128>;
-@group(0) @binding(1) var<storage, read_write> output: array<CollatzResult>;
-
-fn is_one(n: U128) -> bool {
-    return n.parts[0] == 1u && n.parts[1] == 0u && n.parts[2] == 0u && n.parts[3] == 0u;
-}
-
-fn is_even(n: U128) -> bool {
-    return (n.parts[0] & 1u) == 0u;
-}
-
-fn div_by_2(n: U128) -> U128 {
-    var result: U128;
-    // right shift by 1 and get the bottom of the highrt one
-    result.parts[0] = (n.parts[0] >> 1u) | ((n.parts[1] & 1u) << 31u);
-    result.parts[1] = (n.parts[1] >> 1u) | ((n.parts[2] & 1u) << 31u);
-    result.parts[2] = (n.parts[2] >> 1u) | ((n.parts[3] & 1u) << 31u);
-    result.parts[3] = n.parts[3] >> 1u;
-    return result;
-}
-
-struct U128AddResult {
-    value: U128,
-    carry: u32,      // 1 if overflowed past 128 bits
-};
-
-fn add_u128(a: U128, b: U128) -> U128AddResult {
-    var total: U128;
-    var res: U128AddResult;
-    var carry = 0u;
-
-    let sum0 = a.parts[0] + b.parts[0];
-    total.parts[0] = sum0;
-    carry = u32(sum0 < a.parts[0]);
-
-    let sum1 = a.parts[1] + b.parts[1] + carry;
-    total.parts[1] = sum1;
-    carry = u32(sum1 < a.parts[1] || (carry == 1u && sum1 == a.parts[1]));
-
-    let sum2 = a.parts[2] + b.parts[2] + carry;
-    total.parts[2] = sum2;
-    carry = u32(sum2 < a.parts[2] || (carry == 1u && sum2 == a.parts[2]));
-
-    let sum3 = a.parts[3] + b.parts[3] + carry;
-    total.parts[3] = sum3;
-    carry = u32(sum3 < a.parts[3] || (carry == 1u && sum3 == a.parts[3]));
-
-    res.value=total;
-    res.carry=carry;
-    return res;
-}
-
-
 fn mul_3_add_1(n: U128) -> U128AddResult {
 
     let doubled = add_u128(n, n);
@@ -258,18 +210,14 @@ fn mul_3_add_1(n: U128) -> U128AddResult {
     
     return result;
 }
+```
 
-fn greater_than(a: U128, b: U128) -> bool {
-    if (a.parts[3] != b.parts[3]) { return a.parts[3] > b.parts[3]; }
-    if (a.parts[2] != b.parts[2]) { return a.parts[2] > b.parts[2]; }
-    if (a.parts[1] != b.parts[1]) { return a.parts[1] > b.parts[1]; }
-    return a.parts[0] > b.parts[0];
-}
+## Put it all together
 
-// Check if two U128 values are equal
-fn equals(a: U128, b: U128) -> bool {
-    return a.parts[0] == b.parts[0] && a.parts[1] == b.parts[1] && 
-           a.parts[2] == b.parts[2] && a.parts[3] == b.parts[3];
+```wgsl
+struct CollatzResult {
+    steps: u32,
+    max: U128,
 }
 
 fn collatz(n_input: U128) -> CollatzResult {
@@ -277,10 +225,8 @@ fn collatz(n_input: U128) -> CollatzResult {
     var steps = 0u;
     var max = n;
     
-    // Floyd's cycle detection: slow and fast pointers
-    var slow = n;
-    var fast = n;
-    var slow_steps = 0u;
+    var tortoise = n;
+    var tortoise_steps = 0u;
 
     var result: CollatzResult;
     
@@ -299,15 +245,8 @@ fn collatz(n_input: U128) -> CollatzResult {
         } else {
             let a = mul_3_add_1(n);
             if a.carry == 1u {
-
-                var zero: U128;
-                zero.parts[0] = 0u;
-                zero.parts[1] = 0u;
-                zero.parts[2] = 0u;
-                zero.parts[3] = 0u;
-
                 result.steps = steps;
-                result.max = zero;
+                result.max = ZERO_U128;
                 return result;
             }
 
@@ -321,17 +260,17 @@ fn collatz(n_input: U128) -> CollatzResult {
         
         steps++;
         
-        // Cycle detection: advance slow pointer every other step
+        // Cycle detection: advance tortoise pointer every other step
         if (steps % 2u == 0u) {
-            if (is_even(slow)) {
-                slow = div_by_2(slow);
+            if (is_even(tortoise)) {
+                tortoise = div_by_2(tortoise);
             } else {
-                slow = mul_3_add_1(slow).value;
+                tortoise = mul_3_add_1(tortoise).value;
             }
-            slow_steps++;
+            tortoise_steps++;
             
-            // Check if we've found a cycle (fast caught up to slow)
-            if (equals(n, slow) && steps > 2u) {
+            // Check if we've found a cycle (tortoise meets hare)
+            if (equals(n, tortoise) && steps > 2u) {
                 // Cycle detected, break out
                 // WE NEED SOME WAY TO RETURN CYCLE
                 break;
@@ -343,7 +282,13 @@ fn collatz(n_input: U128) -> CollatzResult {
     result.max = max;
     return result;
 }
+```
 
+This wgsl code will solve our problem but how do we actually pass the data between CPU and GPU?
+
+## Passing data between CPU and GPU
+
+```wgsl
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let idx = id.x;
@@ -351,7 +296,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         output[idx] = collatz(input[idx]);
     }
 }
-
 ```
 
 `@group(0) @binding(0) var<storage, read> input: array<u32>;`
