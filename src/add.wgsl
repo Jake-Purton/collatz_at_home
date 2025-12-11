@@ -159,6 +159,7 @@ fn collatz(n_input: U128) -> CollatzResult {
             // Check if we've found a cycle (fast caught up to slow)
             if (equals(n, slow) && steps > 2u) {
                 // Cycle detected, break out
+                // WE NEED SOME WAY TO RETURN CYCLE
                 break;
             }
         }
