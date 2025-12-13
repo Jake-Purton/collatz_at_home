@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use wgpu::util::DeviceExt;
 
 // 50,000 is 1mb
-const RANGE: u128 = 50_000;
+const RANGE: u128 = 10_000;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {

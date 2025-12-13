@@ -145,8 +145,8 @@ fn collatz(n_input: U128) -> CollatzResult {
             
             // check if we've found a cycle (tortoise meets hare)
             if (equals(n, tortoise) && steps > 2u) {
-                // Cycle detected, break out
-                // WE NEED SOME WAY TO RETURN CYCLE
+                // top bit of steps represents a cycle
+                steps = steps | (1u << 31u);
                 break;
             }
         }
