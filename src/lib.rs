@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use wgpu::util::DeviceExt;
 
 // 50,000 is 1mb
-const RANGE: u128 = 10_000;
+const RANGE: u32 = 100_000;
 
 // Helper function to convert u128 to array of 4 u32s (little-endian)
 fn u128_to_u32_array(n: u128) -> [u32; 4] {
@@ -109,7 +109,7 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<Vec<u32>, JsValue> {
         return Err(JsValue::from_str("Could not parse n"));
     };
 
-    let test_numbers: Vec<u128> = (n..n + RANGE).collect();
+    let test_numbers: Vec<u128> = (n..n + RANGE as u128).collect();
 
     // Convert to GPU format (4 × u32 per number)
     let input_data: Vec<u8> = test_numbers
@@ -209,6 +209,12 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<Vec<u32>, JsValue> {
     let data = buffer_slice.get_mapped_range();
     let results: &[u32] = bytemuck::cast_slice(&data);
 
+    // number reached, n
+    let mut highest_reached: (u128, u128) = (0, 0);
+    let mut overflows: u32 = 0;
+    // steps, n
+    let mut most_steps: (u32, u128) = (0, 0);
+
     for (i, &n) in test_numbers.iter().enumerate() {
         let offset = i * 5;
         let steps = results[offset];
@@ -220,15 +226,42 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<Vec<u32>, JsValue> {
         ];
         let max_value = u32_array_to_u128(&max_parts);
 
-        if n % 25_000 == 0 {
-            console_log!("n: {n}, steps: {steps}, max_value: {max_value}")
+        if max_value == 0 {
+            overflows += 1;
+            continue;
+        }
+
+        if highest_reached.0 < max_value {
+            highest_reached.0 = max_value;
+            highest_reached.1 = n;
+        }
+
+        if most_steps.0 < steps {
+            most_steps.0 = steps;
+            most_steps.1 = n;
         }
     }
 
-    let vec_results = results.to_vec();
+
+    let mut interesting_results: Vec<u32> = Vec::new();
+
+    // 0th word = overflows
+    interesting_results.push(overflows);
+    // 1,2,3,4 are max reached
+    interesting_results.extend_from_slice(&u128_to_u32_array(highest_reached.0));
+    // 5,6,7,8 are n for max reached
+    interesting_results.extend_from_slice(&u128_to_u32_array(highest_reached.1));
+    // 9 is steps
+    interesting_results.push(most_steps.0);
+    // 10, 11, 12, 13 is n for steps
+    interesting_results.extend_from_slice(&u128_to_u32_array(most_steps.1));
+    // 14 is range
+    interesting_results.push(RANGE);
 
     drop(data);
     staging_buffer.unmap();
 
-    Ok(vec_results)
+    console_log!("{:?}", interesting_results);
+
+    Ok(interesting_results)
 }
