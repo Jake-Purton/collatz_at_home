@@ -216,7 +216,7 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<Vec<u32>, JsValue> {
     let mut most_steps: (u32, u128) = (0, 0);
 
     for (i, &n) in test_numbers.iter().enumerate() {
-        let offset = i * 5;
+        let offset = i * 8; // 32 bytes per result / 4 bytes per u32 = 8 u32s
         let steps = results[offset];
         let max_parts = [
             results[offset + 1],
@@ -228,7 +228,6 @@ pub async fn do_gpu_collatz(start_n: String) -> Result<Vec<u32>, JsValue> {
 
         if max_value == 0 {
             overflows += 1;
-            continue;
         }
 
         if highest_reached.0 < max_value {
